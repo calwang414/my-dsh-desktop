@@ -1,12 +1,13 @@
 # Stage the self-contained runtime resources for the Windows desktop bundle:
 #   1. the official Node binary (win-x64) under resources/node
 #   2. the npm-installed @deepseek-ai/dsh harness under resources/harness
-# Run from the repository root before 'cargo tauri build' (or in CI).
+# Run from anywhere; the resource dir is derived from this script's own
+# location (scripts/ sits next to src-tauri/).
 $ErrorActionPreference = 'Stop'
 
 $NodeVersion = if ($env:NODE_VERSION) { $env:NODE_VERSION } else { 'v22.23.2' }
 $DshVersion = if ($env:DSH_VERSION) { $env:DSH_VERSION } else { '0.1.0-rc.6' }
-$Res = 'apps/desktop/src-tauri/resources'
+$Res = Join-Path (Split-Path -Parent $PSScriptRoot) 'src-tauri/resources'
 
 New-Item -ItemType Directory -Force -Path $Res | Out-Null
 

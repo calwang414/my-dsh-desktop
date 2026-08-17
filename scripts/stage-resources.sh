@@ -2,12 +2,14 @@
 # Stage the self-contained runtime resources for the desktop bundle:
 #   1. the official Node binary (darwin-arm64) under resources/node
 #   2. the npm-installed @deepseek-ai/dsh harness under resources/harness
-# Run from the repository root before `cargo tauri build`.
+# Run from anywhere; the resource dir is derived from this script's own
+# location (scripts/ sits next to src-tauri/).
 set -euo pipefail
 
 NODE_VERSION="${NODE_VERSION:-v22.23.2}"
 DSH_VERSION="${DSH_VERSION:-0.1.0-rc.6}"
-RES="apps/desktop/src-tauri/resources"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RES="$(dirname "$SCRIPT_DIR")/src-tauri/resources"
 
 mkdir -p "$RES"
 if [ ! -x "$RES/node/bin/node" ]; then
