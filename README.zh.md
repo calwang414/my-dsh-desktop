@@ -45,7 +45,7 @@ Tauri 不支持交叉编译，Windows 安装包必须在 Windows 环境构建—
 ```powershell
 powershell -File scripts/stage-resources.ps1   # stage node.exe + harness (once)
 cd src-tauri
-cargo tauri build --bundles nsis,msi                        # .exe (NSIS) + .msi
+cargo tauri build --bundles nsis msi                         # .exe (NSIS) + .msi
 ```
 
 未签名的安装包首次运行会被 SmartScreen 拦截：更多信息 → 仍要运行。

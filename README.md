@@ -45,7 +45,7 @@ Tauri does not cross-compile, so the Windows installer must be built on a Window
 ```powershell
 powershell -File scripts/stage-resources.ps1   # stage node.exe + harness (once)
 cd src-tauri
-cargo tauri build --bundles nsis,msi                        # .exe (NSIS) + .msi
+cargo tauri build --bundles nsis msi                         # .exe (NSIS) + .msi
 ```
 
 The unsigned installer triggers SmartScreen on first run: More info → Run anyway.
