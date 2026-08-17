@@ -13,6 +13,9 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -252,19 +255,34 @@ const PET_SCREEN_MARGIN: f64 = 16.0;
 /// Approximate macOS Dock height when it sits at the bottom of the screen.
 const PET_DOCK_OFFSET: f64 = 72.0;
 
-/// Whether a URL answers with any 2xx (probe for plugin pages; unlike the
-/// boot-manifest probe, the pet page carries no __DSH_BOOT__ marker).
-fn probe_url_ok(url: &Url) -> bool {
-    let Some(host) = url.host_str() else { return false };
-    let Some(port) = url.port_or_known_default() else { return false };
-    let Ok(mut stream) = TcpStream::connect((host, port)) else { return false };
+/// Perform a minimal HTTP GET and return the raw response (headers + body).
+fn http_get(url: &Url) -> Option<String> {
+    let host = url.host_str()?;
+    let port = url.port_or_known_default()?;
+    let mut stream = TcpStream::connect((host, port)).ok()?;
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     let crlf = String::from_utf8(vec![13, 10]).expect("CRLF is valid utf-8");
     let request = format!("GET {} HTTP/1.1{crlf}Host: {host}{crlf}Connection: close{crlf}{crlf}", url.path());
-    if stream.write_all(request.as_bytes()).is_err() { return false }
+    stream.write_all(request.as_bytes()).ok()?;
     let mut response = String::new();
-    if stream.read_to_string(&mut response).is_err() { return false }
-    response.starts_with("HTTP/1.1 2") || response.starts_with("HTTP/1.0 2")
+    stream.read_to_string(&mut response).ok()?;
+    Some(response)
+}
+
+/// Marker proving a response is the pet plugin's standalone page: the harness
+/// SPA answers 200 with the GUI's index.html for unknown routes, so a 2xx
+/// alone would open the pet window showing the harness homepage.
+const PET_PAGE_MARKER: &str = "pet-standalone.js";
+
+/// Whether the pet plugin's standalone page is genuinely served.
+fn pet_page_served(url: &Url) -> bool {
+    http_get(url)
+        .map(|response| {
+            let status_ok =
+                response.starts_with("HTTP/1.1 2") || response.starts_with("HTTP/1.0 2");
+            status_ok && response.contains(PET_PAGE_MARKER)
+        })
+        .unwrap_or(false)
 }
 
 /// Place a window at the bottom-right of the primary screen's work area.
@@ -311,7 +329,7 @@ fn maybe_create_pet_window(app: &tauri::AppHandle, base_url: &Url) {
             None => return,
         },
     };
-    if !probe_url_ok(&pet_url) {
+    if !pet_page_served(&pet_url) {
         println!("[desktop] pet plugin page not served at {pet_url}; skipping pet window");
         return;
     }
@@ -373,13 +391,17 @@ fn main() {
                 args.join(" "),
                 root.display()
             );
-            let mut child = Command::new(&node)
+            let mut command = Command::new(&node);
+            command
                 .args(&args)
                 .current_dir(&root)
                 .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .expect("failed to spawn the dsh harness");
+                .stderr(Stdio::piped());
+            // node.exe is a console app; without CREATE_NO_WINDOW Windows
+            // pops a cmd window for it at every launch.
+            #[cfg(windows)]
+            command.creation_flags(0x0800_0000);
+            let mut child = command.spawn().expect("failed to spawn the dsh harness");
             let stdout = child.stdout.take().expect("harness stdout pipe");
             let stderr = child.stderr.take().expect("harness stderr pipe");
             app.manage(Harness(Mutex::new(Some(child))));
