@@ -30,7 +30,7 @@ cargo tauri dev         # opens the desktop window
 
 ## Packaging
 
-The bundle is self-contained: the app ships an official Node binary and an npm-installed `@deepseek-ai/dsh` harness in its resources, so the packaged app runs standalone on any macOS arm64 machine — no repo checkout, no Node install, no terminal. The Rust shell finds these via the resource dir at runtime and only falls back to a source checkout in dev builds.
+The bundle is self-contained: the app ships an official Node binary and an npm-installed `@deepseek-ai/dsh` harness in its resources, so the packaged app runs standalone on any macOS machine (Apple Silicon or Intel) — no repo checkout, no Node install, no terminal. CI builds both dmg architectures: arm64 natively, x64 by cross-compiling (`NODE_ARCH=darwin-x64` with `tauri build --target x86_64-apple-darwin`). The Rust shell finds these via the resource dir at runtime and only falls back to a source checkout in dev builds.
 
 ```sh
 scripts/stage-resources.sh   # stage node + harness into src-tauri/resources (once)
@@ -38,14 +38,16 @@ cd src-tauri
 cargo tauri build                          # .app + .dmg
 ```
 
-`NODE_VERSION` and `DSH_VERSION` env vars pin the staged versions. Upgrading the harness is a resource re-staging, not a code change: bump `DSH_VERSION`, re-run the staging script, rebuild. The bundle is currently unsigned (no Developer ID), so first launch requires right-click → Open in Finder. ### Windows
+`NODE_VERSION` and `DSH_VERSION` env vars pin the staged versions. Upgrading the harness is a resource re-staging, not a code change: bump `DSH_VERSION`, re-run the staging script, rebuild. The bundle is currently unsigned (no Developer ID), so first launch requires right-click → Open in Finder.
 
-Tauri does not cross-compile, so the Windows installer must be built on a Windows machine — either the **Desktop build** GitHub Actions workflow (manual trigger; it stages the win-x64 Node binary and uploads the NSIS .exe and MSI from a windows-latest runner) or a local Windows machine/VM:
+### Windows
+
+Tauri does not cross-compile, so the Windows installer must be built on a Windows machine — either the **Desktop build** GitHub Actions workflow (manual trigger; it stages the win-x64 Node binary and uploads the NSIS .exe from a windows-latest runner) or a local Windows machine/VM:
 
 ```powershell
 powershell -File scripts/stage-resources.ps1   # stage node.exe + harness (once)
 cd src-tauri
-cargo tauri build --bundles nsis msi                         # .exe (NSIS) + .msi
+cargo tauri build --bundles nsis                          # .exe (NSIS)
 ```
 
 The unsigned installer triggers SmartScreen on first run: More info → Run anyway.

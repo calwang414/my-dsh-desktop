@@ -30,7 +30,7 @@ cargo tauri dev         # opens the desktop window
 
 ## 打包
 
-打包产物是自包含的：应用资源里捆绑了官方 Node 二进制和 npm 安装的 `@deepseek-ai/dsh` harness，因此打包应用可以在任何 macOS arm64 机器上独立运行——不需要源码检出、不需要安装 Node、不需要终端。Rust 壳在运行时通过资源目录找到它们，只有开发构建才回退到源码检出。
+打包产物是自包含的：应用资源里捆绑了官方 Node 二进制和 npm 安装的 `@deepseek-ai/dsh` harness，因此打包应用可以在任何 macOS 机器（Apple Silicon 与 Intel）上独立运行——不需要源码检出、不需要安装 Node、不需要终端。CI 同时产出两种架构的 dmg：arm64 原生构建，x64 交叉编译（`NODE_ARCH=darwin-x64` 搭配 `tauri build --target x86_64-apple-darwin`）。Rust 壳在运行时通过资源目录找到它们，只有开发构建才回退到源码检出。
 
 ```sh
 scripts/stage-resources.sh   # stage node + harness into src-tauri/resources (once)
@@ -38,14 +38,16 @@ cd src-tauri
 cargo tauri build                          # .app + .dmg
 ```
 
-`NODE_VERSION` 和 `DSH_VERSION` 环境变量固定要暂存的版本。升级 harness 只是重新暂存资源，不是改代码：改 `DSH_VERSION`、重跑脚本、重新构建。当前包未签名（没有 Developer ID），首次打开需要在 Finder 里右键 → 打开。### Windows
+`NODE_VERSION` 和 `DSH_VERSION` 环境变量固定要暂存的版本。升级 harness 只是重新暂存资源，不是改代码：改 `DSH_VERSION`、重跑脚本、重新构建。当前包未签名（没有 Developer ID），首次打开需要在 Finder 里右键 → 打开。
 
-Tauri 不支持交叉编译，Windows 安装包必须在 Windows 环境构建——要么用 **Desktop build** GitHub Actions 工作流（手动触发，在 windows-latest runner 上暂存 win-x64 Node 并产出 NSIS .exe 与 MSI），要么用本地 Windows 机器/虚拟机：
+### Windows
+
+Tauri 不支持交叉编译，Windows 安装包必须在 Windows 环境构建——要么用 **Desktop build** GitHub Actions 工作流（手动触发，在 windows-latest runner 上暂存 win-x64 Node 并产出 NSIS .exe），要么用本地 Windows 机器/虚拟机：
 
 ```powershell
 powershell -File scripts/stage-resources.ps1   # stage node.exe + harness (once)
 cd src-tauri
-cargo tauri build --bundles nsis msi                         # .exe (NSIS) + .msi
+cargo tauri build --bundles nsis                          # .exe (NSIS)
 ```
 
 未签名的安装包首次运行会被 SmartScreen 拦截：更多信息 → 仍要运行。
