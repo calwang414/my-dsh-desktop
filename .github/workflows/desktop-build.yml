@@ -23,7 +23,7 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@2
       - name: Build
-        run: tauri build --manifest-path src-tauri/Cargo.toml
+        run: tauri build
       - name: Upload dmg
         uses: actions/upload-artifact@v4
         with:
@@ -49,7 +49,7 @@ jobs:
         run: npm install -g @tauri-apps/cli@2
       - name: Build (NSIS installer is the primary target)
         shell: pwsh
-        run: tauri build --manifest-path src-tauri/Cargo.toml --bundles nsis,msi
+        run: tauri build --bundles nsis,msi
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
