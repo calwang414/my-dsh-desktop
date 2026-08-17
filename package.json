@@ -6,8 +6,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "apps/desktop"
+    "url": "git+https://github.com/calwang414/my-dsh-desktop.git"
   },
   "scripts": {
     "dev": "cargo tauri dev --manifest-path src-tauri/Cargo.toml",
