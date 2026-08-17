@@ -1,3 +1,7 @@
+// Without this the Windows exe is a console-subsystem app: Windows opens a
+// cmd window for it at every launch (showing the shell's own log lines).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 //! Tauri desktop shell for the DeepSeek Harness Web GUI.
 //!
 //! The shell is a thin supervisor, not a fork of the product: when a harness is
