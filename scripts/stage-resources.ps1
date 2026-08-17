@@ -20,14 +20,18 @@ if (-not (Test-Path (Join-Path $Res 'node/node.exe'))) {
   Expand-Archive -Path $zip -DestinationPath $extract
   New-Item -ItemType Directory -Force -Path (Join-Path $Res 'node') | Out-Null
   Copy-Item (Join-Path $extract ("node-" + $NodeVersion + "-win-x64/node.exe")) (Join-Path $Res 'node/node.exe')
-  # Only node.exe is needed; npm/npx/corepack shims and node_modules would bloat the bundle.
+  # npm/npx shims and their node_modules stay so the bundled toolchain can
+  # install plugins standalone; corepack is skipped on purpose.
+  Copy-Item (Join-Path $extract ("node-" + $NodeVersion + "-win-x64/npm.cmd")) (Join-Path $Res 'node/npm.cmd')
+  Copy-Item (Join-Path $extract ("node-" + $NodeVersion + "-win-x64/npx.cmd")) (Join-Path $Res 'node/npx.cmd')
+  Copy-Item -Recurse (Join-Path $extract ("node-" + $NodeVersion + "-win-x64/node_modules")) (Join-Path $Res 'node/node_modules')
   Remove-Item -Recurse -Force $extract
   Remove-Item -Force $zip
 }
 
 if (-not (Test-Path (Join-Path $Res 'harness/package.json'))) {
   Write-Host ">> installing @deepseek-ai/dsh@$DshVersion into resources/harness"
-  npm install --prefix (Join-Path $Res 'harness') ("@deepseek-ai/dsh@" + $DshVersion) --no-audit --no-fund
+  & (Join-Path $Res 'node/npm.cmd') install --prefix (Join-Path $Res 'harness') ("@deepseek-ai/dsh@" + $DshVersion) pnpm --no-audit --no-fund
   if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 }
 

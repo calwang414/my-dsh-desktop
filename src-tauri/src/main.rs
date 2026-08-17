@@ -64,11 +64,23 @@ fn bundled_node_binary(dir: &Path) -> PathBuf {
     dir.join("node/bin/node")
 }
 
+/// The directory to expose on PATH for bundled node: node.exe sits at the
+/// node dir root in the Windows zip layout, bin/ in the unix tarball layout.
+#[cfg(windows)]
+fn bundled_node_dir(dir: &Path) -> PathBuf {
+    dir.join("node")
+}
+
+#[cfg(not(windows))]
+fn bundled_node_dir(dir: &Path) -> PathBuf {
+    dir.join("node/bin")
+}
+
 /// The harness invocation: web --port 0 so the OS picks a free port.
 /// In a packaged app the bundled node binary and npm-installed harness
 /// (resources/) drive the process; in a dev build node runs the repo source
 /// via tsx. DSH_DESKTOP_NODE and DSH_DESKTOP_REPO_ROOT override both modes.
-fn harness_command(resource_dir: Option<&Path>) -> (String, Vec<String>, PathBuf) {
+fn harness_command(resource_dir: Option<&Path>) -> (String, Vec<String>, PathBuf, Vec<PathBuf>) {
     // Packaged layout: Contents/Resources/resources/{node,harness} (tauri
     // nests configured resources under a resources/ container dir).
     let bundled_root = resource_dir.map(|dir| dir.join("resources"));
@@ -90,7 +102,14 @@ fn harness_command(resource_dir: Option<&Path>) -> (String, Vec<String>, PathBuf
             "--port".to_string(),
             "0".to_string(),
         ];
-        return (node, args, root);
+        // PATH dirs so node/npm/pnpm spawned by the harness (agent shell
+        // calls, dsh plugin add) resolve to the bundled toolchain.
+        let mut path_dirs = vec![bundled_node_dir(&dir)];
+        let pnpm_bin = dir.join("harness/node_modules/.bin");
+        if pnpm_bin.is_dir() {
+            path_dirs.push(pnpm_bin);
+        }
+        return (node, args, root, path_dirs);
     }
     let node = std::env::var("DSH_DESKTOP_NODE").unwrap_or_else(|_| "node".to_string());
     let root = std::env::var("DSH_DESKTOP_REPO_ROOT")
@@ -104,7 +123,7 @@ fn harness_command(resource_dir: Option<&Path>) -> (String, Vec<String>, PathBuf
         "--port".to_string(),
         "0".to_string(),
     ];
-    (node, args, root)
+    (node, args, root, Vec::new())
 }
 
 /// Extract the canonical GUI URL from a harness line: dsh web: http://127.0.0.1:PORT .
@@ -384,7 +403,7 @@ fn main() {
                 return Ok(());
             }
 
-            let (node, args, root) = harness_command(app.path().resource_dir().ok().as_deref());
+            let (node, args, root, path_dirs) = harness_command(app.path().resource_dir().ok().as_deref());
             println!(
                 "[desktop] spawning harness: {} {} (cwd {})",
                 node,
@@ -397,6 +416,23 @@ fn main() {
                 .current_dir(&root)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
+            // Put the bundled toolchain first on PATH so node/npm/pnpm
+            // spawned by the harness (agent shell calls, dsh plugin add)
+            // resolve to the bundle instead of a system install.
+            if !path_dirs.is_empty() {
+                if let Ok(existing) = std::env::var("PATH") {
+                    let mut parts: Vec<String> = path_dirs
+                        .iter()
+                        .map(|dir| dir.to_string_lossy().into_owned())
+                        .collect();
+                    parts.push(existing);
+                    #[cfg(windows)]
+                    let joined = parts.join(";");
+                    #[cfg(not(windows))]
+                    let joined = parts.join(":");
+                    command.env("PATH", joined);
+                }
+            }
             // node.exe is a console app; without CREATE_NO_WINDOW Windows
             // pops a cmd window for it at every launch.
             #[cfg(windows)]

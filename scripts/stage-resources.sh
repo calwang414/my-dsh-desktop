@@ -18,15 +18,18 @@ if [ ! -x "$RES/node/bin/node" ]; then
   curl -fsSL -o /tmp/node.tar.gz "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-$NODE_ARCH.tar.gz"
   tar xzf /tmp/node.tar.gz -C "$RES"
   mv "$RES/node-$NODE_VERSION-$NODE_ARCH" "$RES/node"
-  # Only bin/node is needed; npm/corepack are symlinks into lib/ and would
-  # dangle once lib/ is dropped (tauri-build rejects dangling resource paths).
-  rm -f "$RES/node/bin/npm" "$RES/node/bin/npx" "$RES/node/bin/corepack"
-  rm -rf "$RES/node/include" "$RES/node/lib" "$RES/node/share"
+  # npm/npx ship as symlinks into lib/; keep them and include/ (node-gyp
+  # headers) so the bundled toolchain can install plugins standalone.
+  # corepack has no use here, and share/ is man pages only.
+  rm -f "$RES/node/bin/corepack"
+  rm -rf "$RES/node/share"
 fi
 
 if [ ! -f "$RES/harness/package.json" ]; then
-  echo ">> installing @deepseek-ai/dsh@$DSH_VERSION into resources/harness"
-  npm install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" --no-audit --no-fund
+  echo ">> installing @deepseek-ai/dsh@$DSH_VERSION + pnpm into resources/harness"
+  # npm-cli.js resolves node via PATH (env node), so expose the bundled
+  # node dir and run it through the bundled node explicitly.
+  PATH="$RES/node/bin:$PATH" "$RES/node/bin/node" "$RES/node/bin/npm" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" pnpm --no-audit --no-fund
 fi
 
 echo ">> resources staged:"
