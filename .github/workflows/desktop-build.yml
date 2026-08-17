@@ -1,0 +1,59 @@
+name: Desktop build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  macos:
+    name: macOS (dmg)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Stage bundled resources
+        run: bash scripts/stage-resources.sh
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@2
+      - name: Build
+        run: tauri build --manifest-path src-tauri/Cargo.toml
+      - name: Upload dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-macos
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+  windows:
+    name: Windows (nsis + msi)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Stage bundled resources
+        shell: pwsh
+        run: ./scripts/stage-resources.ps1
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@2
+      - name: Build (NSIS installer is the primary target)
+        shell: pwsh
+        run: tauri build --manifest-path src-tauri/Cargo.toml --bundles nsis,msi
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi

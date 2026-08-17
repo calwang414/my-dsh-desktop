@@ -1,0 +1,6 @@
+src-tauri/target/
+src-tauri/gen/
+src-tauri/resources/
+node_modules/
+.DS_Store
+*.log

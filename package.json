@@ -1,0 +1,18 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "Tauri desktop shell for the DeepSeek Harness Web GUI: a Rust supervisor that spawns the dsh web harness on an OS-assigned port and opens a native window on the GUI",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "apps/desktop"
+  },
+  "scripts": {
+    "dev": "cargo tauri dev --manifest-path src-tauri/Cargo.toml",
+    "build": "cargo tauri build --manifest-path src-tauri/Cargo.toml",
+    "icon": "cargo tauri icon"
+  },
+  "license": "MIT"
+}
