@@ -217,6 +217,43 @@ fn ensure_node_pty_allow_builds(workspace: &Path) -> bool {
     std::fs::write(workspace, patched).is_ok()
 }
 
+/// Whether a webview navigation stays in the window: internal app pages
+/// (tauri://) and harness-origin navigations (SPA routes) stay; everything
+/// else — external links, mailto — goes to the system default browser.
+fn navigation_decision(url: &Url, expected_host: Option<&str>) -> bool {
+    if url.scheme() == "tauri" {
+        return true;
+    }
+    url.host_str() == expected_host
+}
+
+/// on_navigation handler: keep harness-origin navigations in the webview,
+/// open everything else in the system default browser and prevent it.
+fn navigation_policy(url: &Url, expected_host: &Mutex<Option<String>>) -> bool {
+    let host = expected_host.lock().ok().and_then(|h| h.clone());
+    if navigation_decision(url, host.as_deref()) {
+        return true;
+    }
+    let _ = opener::open(url.as_str());
+    false
+}
+
+/// window.open / target=_blank handler: same-origin popups keep Tauri's
+/// default new-window behavior; external URLs open in the system default
+/// browser instead of a new in-app window.
+fn new_window_policy(
+    url: Url,
+    _features: tauri::webview::NewWindowFeatures,
+    expected_host: &Mutex<Option<String>>,
+) -> tauri::webview::NewWindowResponse<tauri::Wry> {
+    let host = expected_host.lock().ok().and_then(|h| h.clone());
+    if navigation_decision(&url, host.as_deref()) {
+        return tauri::webview::NewWindowResponse::Allow;
+    }
+    let _ = opener::open(url.as_str());
+    tauri::webview::NewWindowResponse::Deny
+}
+
 /// Patch every existing profile's pnpm-workspace.yaml so plugin installs can
 /// run node-pty's install script (see ensure_node_pty_allow_builds).
 fn patch_profiles_for_node_pty() {
@@ -451,15 +488,25 @@ fn main() {
             // pnpm >=10 blocks node-pty's install script unless allowlisted;
             // plugins with a terminal feature need it to run.
             patch_profiles_for_node_pty();
+            // The harness host the main window may navigate within; everything
+            // else opens in the system default browser.
+            let expected_host = Arc::new(Mutex::new(None::<String>));
             // Reuse-first: attaching to a running harness is the supported way
             // to view the same sessions from web and desktop simultaneously.
             // The shell owns no process in this mode, so exit does not stop it.
             if let Some(url) = existing_harness_url() {
                 println!("[desktop] reusing running harness at {url}");
+                if let Some(host) = url.host_str() {
+                    *expected_host.lock().unwrap() = Some(host.to_string());
+                }
+                let expected_for_nav = expected_host.clone();
+                let expected_for_new_window = expected_host.clone();
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.clone()))
                     .title("DeepSeek Harness")
                     .inner_size(1280.0, 820.0)
                     .min_inner_size(720.0, 480.0)
+                    .on_navigation(move |url| navigation_policy(url, &expected_for_nav))
+                    .on_new_window(move |url, features| new_window_policy(url, features, &expected_for_new_window))
                     .build()
                     .expect("failed to create the main window");
                 maybe_create_pet_window(app.handle(), &url);
@@ -522,6 +569,8 @@ fn main() {
                 });
             }
 
+            let expected_for_nav = expected_host.clone();
+            let expected_for_new_window = expected_host.clone();
             let window = WebviewWindowBuilder::new(
                 app,
                 "main",
@@ -530,6 +579,8 @@ fn main() {
             .title("DeepSeek Harness")
             .inner_size(1280.0, 820.0)
             .min_inner_size(720.0, 480.0)
+            .on_navigation(move |url| navigation_policy(url, &expected_for_nav))
+            .on_new_window(move |url, features| new_window_policy(url, features, &expected_for_new_window))
             .build()
             .expect("failed to create the main window");
 
@@ -540,6 +591,7 @@ fn main() {
             let ready_for_watchdog = ready.clone();
             let app_for_stdout_end = app.handle().clone();
             let app_for_pet = app.handle().clone();
+            let expected_host_for_url = expected_host.clone();
             thread::spawn(move || {
                 let lines = BufReader::new(stdout).lines();
                 for line in lines.flatten() {
@@ -550,6 +602,9 @@ fn main() {
                         if !ready_for_watchdog.swap(true, Ordering::SeqCst) {
                             println!("[desktop] harness ready at {url}");
                             record_harness_url(&url);
+                            if let Some(host) = url.host_str() {
+                                *expected_host_for_url.lock().unwrap() = Some(host.to_string());
+                            }
                             let _ = window_for_url.navigate(url.clone());
                             maybe_create_pet_window(&app_for_pet, &url);
                         }
@@ -697,6 +752,41 @@ mod pnpm_workspace_tests {
             COUNTER.fetch_add(1, Ordering::SeqCst)
         ));
         assert!(!ensure_node_pty_allow_builds(&missing));
+    }
+}
+
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::navigation_decision;
+    use tauri::Url;
+
+    fn url(s: &str) -> Url {
+        Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn internal_pages_always_stay() {
+        assert!(navigation_decision(&url("tauri://localhost/error.html"), None));
+        assert!(navigation_decision(&url("tauri://localhost/index.html"), Some("127.0.0.1")));
+    }
+
+    #[test]
+    fn harness_origin_stays() {
+        assert!(navigation_decision(&url("http://127.0.0.1:3080/"), Some("127.0.0.1")));
+        assert!(navigation_decision(&url("http://127.0.0.1:3080/sessions/abc"), Some("127.0.0.1")));
+    }
+
+    #[test]
+    fn external_links_leave() {
+        assert!(!navigation_decision(&url("https://example.com/a?b=1"), Some("127.0.0.1")));
+        assert!(!navigation_decision(&url("http://localhost:3080/"), Some("127.0.0.1")));
+        assert!(!navigation_decision(&url("mailto:a@b.c"), Some("127.0.0.1")));
+    }
+
+    #[test]
+    fn unknown_host_before_readiness_leaves() {
+        assert!(!navigation_decision(&url("https://example.com/"), None));
     }
 }
 
