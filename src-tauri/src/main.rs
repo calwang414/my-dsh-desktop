@@ -227,17 +227,6 @@ fn navigation_decision(url: &Url, expected_host: Option<&str>) -> bool {
     url.host_str() == expected_host
 }
 
-/// on_navigation handler: keep harness-origin navigations in the webview,
-/// open everything else in the system default browser and prevent it.
-fn navigation_policy(url: &Url, expected_host: &Mutex<Option<String>>) -> bool {
-    let host = expected_host.lock().ok().and_then(|h| h.clone());
-    if navigation_decision(url, host.as_deref()) {
-        return true;
-    }
-    let _ = opener::open(url.as_str());
-    false
-}
-
 /// window.open / target=_blank handler: same-origin popups keep Tauri's
 /// default new-window behavior; external URLs open in the system default
 /// browser instead of a new in-app window.
@@ -499,13 +488,11 @@ fn main() {
                 if let Some(host) = url.host_str() {
                     *expected_host.lock().unwrap() = Some(host.to_string());
                 }
-                let expected_for_nav = expected_host.clone();
                 let expected_for_new_window = expected_host.clone();
                 WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.clone()))
                     .title("DeepSeek Harness")
                     .inner_size(1280.0, 820.0)
                     .min_inner_size(720.0, 480.0)
-                    .on_navigation(move |url| navigation_policy(url, &expected_for_nav))
                     .on_new_window(move |url, features| new_window_policy(url, features, &expected_for_new_window))
                     .build()
                     .expect("failed to create the main window");
@@ -569,7 +556,6 @@ fn main() {
                 });
             }
 
-            let expected_for_nav = expected_host.clone();
             let expected_for_new_window = expected_host.clone();
             let window = WebviewWindowBuilder::new(
                 app,
@@ -579,7 +565,6 @@ fn main() {
             .title("DeepSeek Harness")
             .inner_size(1280.0, 820.0)
             .min_inner_size(720.0, 480.0)
-            .on_navigation(move |url| navigation_policy(url, &expected_for_nav))
             .on_new_window(move |url, features| new_window_policy(url, features, &expected_for_new_window))
             .build()
             .expect("failed to create the main window");
