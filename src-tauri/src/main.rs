@@ -180,6 +180,62 @@ fn harness_home() -> PathBuf {
         .unwrap_or_else(|_| user_home().join(".dsh"))
 }
 
+/// Ensure a profile's pnpm-workspace.yaml allows node-pty's install script.
+/// pnpm >=10 denies install scripts unless allowlisted, and node-pty — a
+/// native dependency of terminal-using plugins such as dsh-better-sidebar —
+/// ships prebuilt binaries but still declares an install script. Idempotent:
+/// existing entries are never rewritten.
+fn ensure_node_pty_allow_builds(workspace: &Path) -> bool {
+    let Ok(content) = std::fs::read_to_string(workspace) else { return false };
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+    match lines.iter().position(|line| line.trim() == "allowBuilds:") {
+        Some(idx) => {
+            let already = lines[idx + 1..].iter().any(|line| {
+                let key = line
+                    .trim_start()
+                    .split(':')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches('"');
+                key == "node-pty"
+            });
+            if already {
+                return false;
+            }
+            lines.insert(idx + 1, "  node-pty: true".to_string());
+        }
+        None => {
+            lines.push(String::new());
+            lines.push("allowBuilds:".to_string());
+            lines.push("  node-pty: true".to_string());
+        }
+    }
+    let patched = lines.join("
+") + "
+";
+    std::fs::write(workspace, patched).is_ok()
+}
+
+/// Patch every existing profile's pnpm-workspace.yaml so plugin installs can
+/// run node-pty's install script (see ensure_node_pty_allow_builds).
+fn patch_profiles_for_node_pty() {
+    let profiles = harness_home().join("profiles");
+    let Ok(entries) = std::fs::read_dir(&profiles) else { return };
+    for entry in entries.flatten() {
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        let workspace = entry.path().join("pnpm-workspace.yaml");
+        if !workspace.is_file() {
+            continue;
+        }
+        if ensure_node_pty_allow_builds(&workspace) {
+            println!("[desktop] allowed node-pty build script in {}", workspace.display());
+        }
+    }
+}
+
 /// Well-known file recording the URL of the harness THIS app spawned, so a
 /// second app instance attaches to the same server instead of spawning a
 /// second writer (two harness processes writing one session log corrupt it).
@@ -392,6 +448,9 @@ fn stop_harness(app: &tauri::AppHandle) {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
+            // pnpm >=10 blocks node-pty's install script unless allowlisted;
+            // plugins with a terminal feature need it to run.
+            patch_profiles_for_node_pty();
             // Reuse-first: attaching to a running harness is the supported way
             // to view the same sessions from web and desktop simultaneously.
             // The shell owns no process in this mode, so exit does not stop it.
@@ -573,5 +632,71 @@ fn main() {
                 }
             }
         });
+}
+
+
+#[cfg(test)]
+mod pnpm_workspace_tests {
+    use super::ensure_node_pty_allow_builds;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+    fn temp_workspace(name: &str, content: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "dsh-pty-test-{}-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::SeqCst),
+            name
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("pnpm-workspace.yaml");
+        fs::write(&path, content).unwrap();
+        path
+    }
+
+    #[test]
+    fn adds_allow_builds_to_template() {
+        let path = temp_workspace("template", "packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n");
+        assert!(ensure_node_pty_allow_builds(&path));
+        let patched = fs::read_to_string(&path).unwrap();
+        assert!(patched.contains("allowBuilds:\n  node-pty: true\n"), "{patched}");
+        // Idempotent: a second pass changes nothing.
+        assert!(!ensure_node_pty_allow_builds(&path));
+    }
+
+    #[test]
+    fn adds_entry_to_existing_allow_builds() {
+        let path = temp_workspace("existing", "packages:\n  - .\n\nallowBuilds:\n  esbuild: true\n");
+        assert!(ensure_node_pty_allow_builds(&path));
+        let patched = fs::read_to_string(&path).unwrap();
+        assert!(patched.contains("allowBuilds:\n  node-pty: true\n  esbuild: true\n"), "{patched}");
+    }
+
+    #[test]
+    fn leaves_existing_node_pty_alone() {
+        let path = temp_workspace("already", "packages:\n  - .\n\nallowBuilds:\n  node-pty: true\n");
+        assert!(!ensure_node_pty_allow_builds(&path));
+        let patched = fs::read_to_string(&path).unwrap();
+        assert_eq!(patched.lines().filter(|l| l.trim().starts_with("node-pty")).count(), 1);
+    }
+
+    #[test]
+    fn recognizes_quoted_entry() {
+        let path = temp_workspace("quoted", "packages:\n  - .\n\nallowBuilds:\n  \"node-pty\": true\n");
+        assert!(!ensure_node_pty_allow_builds(&path));
+    }
+
+    #[test]
+    fn missing_file_is_a_noop() {
+        let missing = std::env::temp_dir().join(format!(
+            "dsh-pty-test-{}-{}-missing.yaml",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::SeqCst)
+        ));
+        assert!(!ensure_node_pty_allow_builds(&missing));
+    }
 }
 
