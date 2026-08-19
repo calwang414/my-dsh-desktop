@@ -26,11 +26,24 @@ if [ ! -x "$RES/node/bin/node" ]; then
   rm -rf "$RES/node/share"
 fi
 
+# bin/npm 与 bin/npx 在官方 tarball 里是指向 lib/node_modules/npm/bin/
+# 的符号链接；Tauri 打包 resources 时会解引用符号链接，其内部相对
+# require('../lib/cli.js') 随之断裂，npm/npx 一运行就 MODULE_NOT_FOUND。
+# 这里把符号链接替换为指向真实入口的 wrapper 脚本（npm-cli.js 是自执行
+# 脚本，require 即可）。注意仓库根 package.json 为 type: module，无扩展名
+# 的 wrapper 在仓库内会被当作 ESM，所以下面的 npm 调用一律走 npm-cli.js。
+for pair in "npm:../lib/node_modules/npm/bin/npm-cli.js" "npx:../lib/node_modules/npm/bin/npx-cli.js"; do
+  tool="${pair%%:*}"
+  target="${pair#*:}"
+  printf '#!/usr/bin/env node\nrequire(%s)\n' "'$target'" > "$RES/node/bin/$tool"
+  chmod +x "$RES/node/bin/$tool"
+done
+
 if [ ! -f "$RES/harness/package.json" ]; then
   echo ">> installing @deepseek-ai/dsh@$DSH_VERSION + pnpm into resources/harness"
-  # npm-cli.js resolves node via PATH (env node), so expose the bundled
-  # node dir and run it through the bundled node explicitly.
-  PATH="$RES/node/bin:$PATH" "$RES/node/bin/node" "$RES/node/bin/npm" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" "pnpm@$PNPM_VERSION" --no-audit --no-fund
+  # 直接走 npm-cli.js 真实入口：bin/npm 已是无扩展名 wrapper，在仓库内
+  # 会被 ESM 解析而 require 不可用。
+  PATH="$RES/node/bin:$PATH" "$RES/node/bin/node" "$RES/node/lib/node_modules/npm/bin/npm-cli.js" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" "pnpm@$PNPM_VERSION" --no-audit --no-fund
 fi
 
 echo ">> resources staged:"
