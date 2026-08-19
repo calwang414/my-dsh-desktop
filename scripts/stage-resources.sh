@@ -32,6 +32,9 @@ fi
 # 这里把符号链接替换为指向真实入口的 wrapper 脚本（npm-cli.js 是自执行
 # 脚本，require 即可）。注意仓库根 package.json 为 type: module，无扩展名
 # 的 wrapper 在仓库内会被当作 ESM，所以下面的 npm 调用一律走 npm-cli.js。
+# 必须先删除符号链接再写文件：shell 重定向会跟随符号链接，不删的话 wrapper
+# 会被写进 lib/node_modules/npm/bin/npm-cli.js 真身，npm 一运行就递归 require。
+rm -f "$RES/node/bin/npm" "$RES/node/bin/npx"
 for pair in "npm:../lib/node_modules/npm/bin/npm-cli.js" "npx:../lib/node_modules/npm/bin/npx-cli.js"; do
   tool="${pair%%:*}"
   target="${pair#*:}"
