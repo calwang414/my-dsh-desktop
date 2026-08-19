@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 
 $NodeVersion = if ($env:NODE_VERSION) { $env:NODE_VERSION } else { 'v22.23.2' }
 $DshVersion = if ($env:DSH_VERSION) { $env:DSH_VERSION } else { '0.1.0-rc.6' }
+$PnpmVersion = if ($env:PNPM_VERSION) { $env:PNPM_VERSION } else { '11.22.0' }
 $Res = Join-Path (Split-Path -Parent $PSScriptRoot) 'src-tauri/resources'
 
 New-Item -ItemType Directory -Force -Path $Res | Out-Null
@@ -31,7 +32,7 @@ if (-not (Test-Path (Join-Path $Res 'node/node.exe'))) {
 
 if (-not (Test-Path (Join-Path $Res 'harness/package.json'))) {
   Write-Host ">> installing @deepseek-ai/dsh@$DshVersion into resources/harness"
-  & (Join-Path $Res 'node/npm.cmd') install --prefix (Join-Path $Res 'harness') ("@deepseek-ai/dsh@" + $DshVersion) pnpm --no-audit --no-fund
+  & (Join-Path $Res 'node/npm.cmd') install --prefix (Join-Path $Res 'harness') ("@deepseek-ai/dsh@" + $DshVersion) ("pnpm@" + $PnpmVersion) --no-audit --no-fund
   if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 }
 

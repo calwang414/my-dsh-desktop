@@ -9,6 +9,7 @@ set -euo pipefail
 NODE_VERSION="${NODE_VERSION:-v22.23.2}"
 DSH_VERSION="${DSH_VERSION:-0.1.0-rc.6}"
 NODE_ARCH="${NODE_ARCH:-darwin-arm64}"
+PNPM_VERSION="${PNPM_VERSION:-11.22.0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RES="$(dirname "$SCRIPT_DIR")/src-tauri/resources"
 
@@ -29,7 +30,7 @@ if [ ! -f "$RES/harness/package.json" ]; then
   echo ">> installing @deepseek-ai/dsh@$DSH_VERSION + pnpm into resources/harness"
   # npm-cli.js resolves node via PATH (env node), so expose the bundled
   # node dir and run it through the bundled node explicitly.
-  PATH="$RES/node/bin:$PATH" "$RES/node/bin/node" "$RES/node/bin/npm" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" pnpm --no-audit --no-fund
+  PATH="$RES/node/bin:$PATH" "$RES/node/bin/node" "$RES/node/bin/npm" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" "pnpm@$PNPM_VERSION" --no-audit --no-fund
 fi
 
 echo ">> resources staged:"
