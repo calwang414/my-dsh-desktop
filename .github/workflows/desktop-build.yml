@@ -2,6 +2,12 @@ name: Desktop build
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag/version (e.g. v0.1.1). Leave empty to only upload artifacts, no GitHub Release.'
+        required: false
+        default: ''
+
 
 jobs:
   macos:
@@ -67,3 +73,24 @@ jobs:
         with:
           name: windows-installers
           path: src-tauri/target/release/bundle/nsis/*.exe
+
+  release:
+    name: Publish GitHub Release
+    if: inputs.version != ''
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.version }}" dist/* \
+            --title "DeepSeek Harness ${{ inputs.version }}" \
+            --generate-notes
