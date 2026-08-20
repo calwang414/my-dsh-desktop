@@ -103,6 +103,9 @@ fn harness_command(resource_dir: Option<&Path>) -> (String, Vec<String>, PathBuf
         let args = vec![
             "node_modules/@deepseek-ai/dsh/lib/bin.js".to_string(),
             "web".to_string(),
+            // dsh >= rc.8 opens the default browser on startup unless
+            // --no-open is passed; the desktop shell is the browser.
+            "--no-open".to_string(),
             "--port".to_string(),
             "0".to_string(),
         ];
