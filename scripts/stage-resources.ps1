@@ -32,6 +32,8 @@ if (-not (Test-Path (Join-Path $Res 'node/node.exe'))) {
 
 if (-not (Test-Path (Join-Path $Res 'harness/package.json'))) {
   Write-Host ">> installing @deepseek-ai/dsh@$DshVersion into resources/harness"
+  # npm resolving the dsh tree peaks over the default 2GB V8 heap on CI.
+  $env:NODE_OPTIONS = "--max-old-space-size=4096"
   & (Join-Path $Res 'node/npm.cmd') install --prefix (Join-Path $Res 'harness') ("@deepseek-ai/dsh@" + $DshVersion) ("pnpm@" + $PnpmVersion) --no-audit --no-fund
   if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
 }

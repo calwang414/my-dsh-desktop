@@ -46,7 +46,9 @@ if [ ! -f "$RES/harness/package.json" ]; then
   echo ">> installing @deepseek-ai/dsh@$DSH_VERSION + pnpm into resources/harness"
   # 直接走 npm-cli.js 真实入口：bin/npm 已是无扩展名 wrapper，在仓库内
   # 会被 ESM 解析而 require 不可用。
-  PATH="$RES/node/bin:$PATH" "$RES/node/bin/node" "$RES/node/lib/node_modules/npm/bin/npm-cli.js" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" "pnpm@$PNPM_VERSION" --no-audit --no-fund
+  # npm resolving the dsh tree peaks over the default 2GB V8 heap on CI;
+  # raise the limit for the install process only.
+  PATH="$RES/node/bin:$PATH" NODE_OPTIONS="--max-old-space-size=4096" "$RES/node/bin/node" "$RES/node/lib/node_modules/npm/bin/npm-cli.js" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" "pnpm@$PNPM_VERSION" --no-audit --no-fund
 fi
 
 echo ">> resources staged:"
