@@ -7,7 +7,7 @@
 set -euo pipefail
 
 NODE_VERSION="${NODE_VERSION:-v22.23.2}"
-DSH_VERSION="${DSH_VERSION:-0.1.0-rc.8}"
+DSH_VERSION="${DSH_VERSION:-0.1.1-rc.1}"
 NODE_ARCH="${NODE_ARCH:-darwin-arm64}"
 PNPM_VERSION="${PNPM_VERSION:-11.22.0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
