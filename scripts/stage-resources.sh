@@ -51,6 +51,19 @@ if [ ! -f "$RES/harness/package.json" ]; then
   PATH="$RES/node/bin:$PATH" NODE_OPTIONS="--max-old-space-size=4096" "$RES/node/bin/node" "$RES/node/lib/node_modules/npm/bin/npm-cli.js" install --prefix "$RES/harness" "@deepseek-ai/dsh@$DSH_VERSION" "pnpm@$PNPM_VERSION" --no-audit --no-fund
 fi
 
+# pnpm/pnpx shim 在 .bin 下是指向 pnpm 包内 bin/pnpm.mjs 的符号链接；
+# Tauri 打包 resources 时会解引用符号链接，ESM shim 的 ../dist 相对导入
+# 就从 pnpm/bin/ 基准偏移到 .bin/ 基准而断裂（node_modules/dist/pnpm.mjs
+# 不存在）。替换为 CJS wrapper：require 包内 pnpm.cjs，其内部的动态
+# import 都在 pnpm 包内解析，打包解引用不影响。
+rm -f "$RES/harness/node_modules/.bin/pnpm" "$RES/harness/node_modules/.bin/pnpx"
+for pair in "pnpm:../pnpm/bin/pnpm.cjs" "pnpx:../pnpm/bin/pnpx.cjs"; do
+  tool="${pair%%:*}"
+  target="${pair#*:}"
+  printf '#!/usr/bin/env node\nrequire(%s)\n' "'$target'" > "$RES/harness/node_modules/.bin/$tool"
+  chmod +x "$RES/harness/node_modules/.bin/$tool"
+done
+
 echo ">> resources staged:"
 du -sh "$RES/node" "$RES/harness"
 
