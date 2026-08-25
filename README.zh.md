@@ -52,4 +52,16 @@ cargo tauri build --bundles nsis                          # .exe (NSIS)
 
 未签名的安装包首次运行会被 SmartScreen 拦截：更多信息 → 仍要运行。
 
+## 安装
+
+安装包未签名（没有 Developer ID），macOS 与 Windows 首次启动都需要额外确认一步。
+
+**macOS**（dmg）：打开 dmg，把 `DeepSeek Harness.app` 拖入"应用程序"。首次启动会被 Gatekeeper 拦截——右键点击应用选择"打开"，或执行一次清除隔离属性：
+
+```sh
+xattr -cr "/Applications/DeepSeek Harness.app"
+```
+
+**Windows**（NSIS 安装器）：运行 `DeepSeek Harness_0.1.x_x64-setup.exe`；SmartScreen 提示"已保护你的电脑"时，点"更多信息 → 仍要运行"。
+
 打包应用保持"复用优先"行为：本机 127.0.0.1:3080 已有 harness 时直接附着（绝不停止它）；否则启动捆绑的 harness，退出时回收。

@@ -52,4 +52,16 @@ cargo tauri build --bundles nsis                          # .exe (NSIS)
 
 The unsigned installer triggers SmartScreen on first run: More info → Run anyway.
 
+## Installing
+
+The installers are unsigned (no Developer ID), so macOS and Windows add an extra confirmation step on first launch.
+
+**macOS** (dmg): open the dmg and drag `DeepSeek Harness.app` into Applications. Gatekeeper blocks the first launch; right-click the app and choose Open, or clear the quarantine attribute once:
+
+```sh
+xattr -cr "/Applications/DeepSeek Harness.app"
+```
+
+**Windows** (NSIS installer): run `DeepSeek Harness_0.1.x_x64-setup.exe`; when SmartScreen shows "Windows protected your PC", choose More info -> Run anyway.
+
 The reuse-first behavior is unchanged in the packaged app: when a harness already serves 127.0.0.1:3080 the app attaches to it (and never stops it); otherwise it spawns the bundled harness and tears it down on exit.
