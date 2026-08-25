@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 $NodeVersion = if ($env:NODE_VERSION) { $env:NODE_VERSION } else { 'v22.23.2' }
-$DshVersion = if ($env:DSH_VERSION) { $env:DSH_VERSION } else { '0.1.1-rc.1' }
+$DshVersion = if ($env:DSH_VERSION) { $env:DSH_VERSION } else { '0.1.1-rc.2' }
 $PnpmVersion = if ($env:PNPM_VERSION) { $env:PNPM_VERSION } else { '11.22.0' }
 $Res = Join-Path (Split-Path -Parent $PSScriptRoot) 'src-tauri/resources'
 
