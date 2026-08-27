@@ -40,6 +40,18 @@ cargo tauri build                          # .app + .dmg
 
 `NODE_VERSION` 和 `DSH_VERSION` 环境变量固定要暂存的版本。升级 harness 只是重新暂存资源，不是改代码：改 `DSH_VERSION`、重跑脚本、重新构建。当前包未签名（没有 Developer ID），首次打开需要在 Finder 里右键 → 打开。
 
+### 麦克风/摄像头权限(macOS)
+
+页面内语音(voice-pet 按住说话、dsh-jarvis 唤醒词)经 `getUserMedia` 请求麦克风。
+macOS TCC 只有在应用 Info.plist 声明用途描述时才会弹授权窗并被允许；缺少声明时请求
+直接 `NotAllowedError` 且**不弹窗**(桌面窗口麦克风不可用的最常见原因)。
+
+- 声明在 `src-tauri/Info.plist`(`NSMicrophoneUsageDescription` / `NSCameraUsageDescription`),
+  由 `tauri.conf.json` 的 `bundle.macOS.infoPlist` 合并进构建产物;
+- 应用升级后若之前拒绝过授权:系统设置 → 隐私与安全性 → 麦克风 → 打开
+  「DeepSeek Harness」并重启应用;或 `tccutil reset Microphone ai.deepseek.harness.desktop` 后重试;
+- `cargo tauri dev` 开发态使用宿主签名,系统弹窗归属为开发壳,授权行为相同。
+
 ### Windows
 
 Tauri 不支持交叉编译，Windows 安装包必须在 Windows 环境构建——要么用 **Desktop build** GitHub Actions 工作流（手动触发，在 windows-latest runner 上暂存 win-x64 Node 并产出 NSIS .exe），要么用本地 Windows 机器/虚拟机：

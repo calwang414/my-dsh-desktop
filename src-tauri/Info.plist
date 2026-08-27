@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- GuiWebView uses getUserMedia for in-page voice input (voice-pet 按住说话 /
+	     dsh-jarvis 唤醒词). macOS TCC shows the permission prompt and allows
+	     capture only when this usage description is declared; without it the
+	     webview request is denied with NotAllowedError and no prompt appears. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>DeepSeek Harness 需要使用麦克风,用于语音唤醒、语音输入与语音播报(仅经你的输入触发)。</string>
+	<!-- 预留:页面内摄像头预览(如贾维斯视角 P1)需要时启用 -->
+	<key>NSCameraUsageDescription</key>
+	<string>DeepSeek Harness 需要使用摄像头,用于页面内视频预览(可后续启用)。</string>
+</dict>
+</plist>
