@@ -4,7 +4,8 @@
   "description": "Window lifecycle for the GUI (loopback http content) and the pet window, which moves itself via setPosition while dragging. Remote origins: the harness serves both windows over loopback http.",
   "windows": [
     "main",
-    "pet"
+    "pet",
+    "jarvis"
   ],
   "remote": {
     "urls": [

@@ -357,6 +357,12 @@ fn terminate(child: &mut Child) {
 
 /// The pet plugin's standalone page route (served by the harness).
 const PET_PAGE_PATH: &str = "/voice-pet/pet";
+/// The jarvis plugin's standalone window page route (served by the harness).
+const JARVIS_PAGE_PATH: &str = "/dsh-jarvis/pet";
+/// Marker proving a response is the jarvis standalone page (SPA fallback guard).
+const JARVIS_PAGE_MARKER: &str = "dsh-jarvis-standalone.js";
+/// Window geometry for the jarvis window (logical points).
+const JARVIS_WINDOW_SIZE: (f64, f64) = (440.0, 640.0);
 /// Window geometry for the pet window (logical points) and screen margin.
 const PET_WINDOW_SIZE: (f64, f64) = (360.0, 480.0);
 const PET_SCREEN_MARGIN: f64 = 16.0;
@@ -397,14 +403,14 @@ fn pet_page_served(url: &Url) -> bool {
 /// Uses LOGICAL coordinates computed from the configured window size, because
 /// outer_size may not be settled immediately after build (a zero size would
 /// push the window off the right edge). Re-applies once after a short delay.
-fn place_bottom_right(window: &WebviewWindow, app: &tauri::AppHandle) {
+fn place_bottom_right(window: &WebviewWindow, app: &tauri::AppHandle, size: (f64, f64)) {
     let Some(monitor) = app.primary_monitor().ok().flatten() else { return };
     let scale = monitor.scale_factor();
     let msize = monitor.size();
     let mw = msize.width as f64 / scale;
     let mh = msize.height as f64 / scale;
-    let x = (mw - PET_WINDOW_SIZE.0 - PET_SCREEN_MARGIN).max(0.0);
-    let y = (mh - PET_WINDOW_SIZE.1 - PET_SCREEN_MARGIN - PET_DOCK_OFFSET).max(0.0);
+    let x = (mw - size.0 - PET_SCREEN_MARGIN).max(0.0);
+    let y = (mh - size.1 - PET_SCREEN_MARGIN - PET_DOCK_OFFSET).max(0.0);
     let position = tauri::LogicalPosition::new(x, y);
     let _ = window.set_position(position);
     println!("[desktop] pet window placed at logical ({x:.0}, {y:.0})");
@@ -458,8 +464,45 @@ fn maybe_create_pet_window(app: &tauri::AppHandle, base_url: &Url) {
             return;
         }
     };
-    place_bottom_right(&pet, app);
+    place_bottom_right(&pet, app, PET_WINDOW_SIZE);
     println!("[desktop] pet window created at {pet_url}");
+}
+
+/// Create the standalone jarvis window (方案 B): same frameless transparent
+/// always-on-top treatment as the pet window, parked at the bottom-right;
+/// created only when the harness serves the jarvis standalone page.
+fn maybe_create_jarvis_window(app: &tauri::AppHandle, base_url: &Url) {
+    let Some(jarvis_url) = base_url.join(JARVIS_PAGE_PATH).ok() else { return };
+    let served = http_get(&jarvis_url)
+        .map(|response| {
+            let status_ok =
+                response.starts_with("HTTP/1.1 2") || response.starts_with("HTTP/1.0 2");
+            status_ok && response.contains(JARVIS_PAGE_MARKER)
+        })
+        .unwrap_or(false);
+    if !served {
+        println!("[desktop] jarvis page not served at {jarvis_url}; skipping jarvis window");
+        return;
+    }
+    let jarvis = match WebviewWindowBuilder::new(app, "jarvis", WebviewUrl::External(jarvis_url.clone()))
+        .title("贾维斯")
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .inner_size(JARVIS_WINDOW_SIZE.0, JARVIS_WINDOW_SIZE.1)
+        .build()
+    {
+        Ok(window) => window,
+        Err(error) => {
+            eprintln!("[desktop] failed to create the jarvis window: {error}");
+            return;
+        }
+    };
+    place_bottom_right(&jarvis, app, JARVIS_WINDOW_SIZE);
+    println!("[desktop] jarvis window created at {jarvis_url}");
 }
 
 /// Kill the harness child, if still owned.
@@ -500,6 +543,7 @@ fn main() {
                     .build()
                     .expect("failed to create the main window");
                 maybe_create_pet_window(app.handle(), &url);
+                maybe_create_jarvis_window(app.handle(), &url);
                 return Ok(());
             }
 
@@ -595,6 +639,7 @@ fn main() {
                             }
                             let _ = window_for_url.navigate(url.clone());
                             maybe_create_pet_window(&app_for_pet, &url);
+                            maybe_create_jarvis_window(&app_for_pet, &url);
                         }
                     }
                 }
