@@ -83,6 +83,27 @@ fn bundled_node_dir(dir: &Path) -> PathBuf {
     dir.join("node/bin")
 }
 
+/// Spawn-side path normalization for Windows: launchers that start this exe
+/// with an extended-length (DOS device) path prefix make Tauri's
+/// resource_dir carry it. cmd.exe cannot consume such PATH entries, and
+/// node 22 crashes on shim main paths built from them (EISDIR: lstat 'D:'),
+/// so strip the prefix before anything spawns.
+#[cfg(windows)]
+fn plain_spawn_path(path: &Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    let rest = text
+        .strip_prefix(r"\\?\UNC\")
+        .map(|r| format!("\\\\{r}"))
+        .or_else(|| text.strip_prefix(r"\\?\").map(str::to_string))
+        .unwrap_or_else(|| text.into_owned());
+    PathBuf::from(rest)
+}
+
+#[cfg(not(windows))]
+fn plain_spawn_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
+}
+
 /// The harness invocation: web --port 0 so the OS picks a free port.
 /// In a packaged app the bundled node binary and npm-installed harness
 /// (resources/) drive the process; in a dev build node runs the repo source
@@ -554,7 +575,12 @@ fn main() {
                 return Ok(());
             }
 
-            let (node, args, root, path_dirs) = harness_command(app.path().resource_dir().ok().as_deref());
+            let resource_dir = app
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|dir| plain_spawn_path(&dir));
+            let (node, args, root, path_dirs) = harness_command(resource_dir.as_deref());
             println!(
                 "[desktop] spawning harness: {} {} (cwd {})",
                 node,
