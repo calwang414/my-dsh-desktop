@@ -38,6 +38,9 @@ const READY_TIMEOUT: Duration = Duration::from_secs(120);
 const URL_LINE_PREFIX: &str = "dsh web: ";
 /// Served index.html marker proving a dsh harness (not some other server) owns a port.
 const BOOT_MANIFEST_MARKER: &str = "__DSH_BOOT__";
+/// Auth-gated engines (dsh >= 0.1.2) answer an anonymous index request with
+/// this 401 body instead of the boot manifest; it proves the port just as well.
+const AUTH_REQUIRED_MARKER: &str = "dsh web authentication required";
 /// The web profile's composed default port, probed before spawning.
 const DEFAULT_HARNESS_URL: &str = "http://127.0.0.1:3080";
 
@@ -148,7 +151,11 @@ fn error_page_url() -> Url {
     Url::parse(&format!("tauri://localhost/{ERROR_PAGE}")).expect("static app URL is valid")
 }
 
-/// Whether a live harness serves the boot-manifest marker on this URL.
+/// Whether a live harness serves this URL. dsh < 0.1.2 serves the index
+/// (boot-manifest marker) anonymously; dsh >= 0.1.2 answers an anonymous
+/// index request with the auth-required 401, so either body proves ownership.
+/// The attach URL itself still carries the printed token query when the
+/// owning shell recorded it, letting the main window mint its session cookie.
 fn probe_harness(url: &Url) -> bool {
     let Some(host) = url.host_str() else { return false };
     let Some(port) = url.port_or_known_default() else { return false };
@@ -158,7 +165,7 @@ fn probe_harness(url: &Url) -> bool {
     if stream.write_all(request.as_bytes()).is_err() { return false }
     let mut response = String::new();
     if stream.read_to_string(&mut response).is_err() { return false }
-    response.contains(BOOT_MANIFEST_MARKER)
+    response.contains(BOOT_MANIFEST_MARKER) || response.contains(AUTH_REQUIRED_MARKER)
 }
 
 /// The user's home directory (HOME on unix, USERPROFILE on Windows).

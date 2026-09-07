@@ -10,7 +10,7 @@ One session log file has exactly one writer. Two harness processes (the web GUI'
 
 ## How it works
 
-1. On startup the shell probes `http://127.0.0.1:3080` (the web profile's composed port; override with `DSH_DESKTOP_HARNESS_URL`, loopback http only) for the harness boot-manifest marker. Found: the window attaches directly; the shell owns no process and never stops it.
+1. On startup the shell probes `http://127.0.0.1:3080` (the web profile's composed port; override with `DSH_DESKTOP_HARNESS_URL`, loopback http only) for the harness boot-manifest marker, or — engines that gate the index behind browser auth (dsh >= 0.1.2) — the auth-required 401 body. Found: the window attaches directly; the shell owns no process and never stops it.
 2. Not found: the shell spawns the harness as a child — `node --import tsx/esm apps/cli/src/bin.ts web --port 0` from the repository root (source checkout) — `--port 0` asks the OS for a free port.
 3. A reader thread drains the harness stdout until `dsh web: http://127.0.0.1:PORT` — the same readiness line supervisors and the keyless CLI smoke already rely on — then navigates the window to it.
 4. A spinner page (`ui/index.html`) shows while booting; `ui/error.html` replaces it when the harness never reports readiness within 120s or dies before doing so.

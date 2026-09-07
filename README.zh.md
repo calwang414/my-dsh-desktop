@@ -10,7 +10,7 @@ DeepSeek Harness Web GUI 的 Tauri 桌面壳。壳采用"复用优先"策略：�
 
 ## 工作原理
 
-1. 启动时壳探测 `http://127.0.0.1:3080`（web profile 的合成端口；可用 `DSH_DESKTOP_HARNESS_URL` 覆盖，仅接受 loopback http）是否返回 harness 启动清单标记。命中：窗口直接附着；壳不拥有任何进程，也绝不会停止它。
+1. 启动时壳探测 `http://127.0.0.1:3080`（web profile 的合成端口；可用 `DSH_DESKTOP_HARNESS_URL` 覆盖，仅接受 loopback http）是否返回 harness 启动清单标记——对以浏览器鉴权保护首页的引擎（dsh >= 0.1.2）则认 401 鉴权提示。命中：窗口直接附着；壳不拥有任何进程，也绝不会停止它。
 2. 未命中：壳以子进程方式启动 harness——在仓库根目录执行 `node --import tsx/esm apps/cli/src/bin.ts web --port 0`（源码检出）——`--port 0` 让 OS 分配空闲端口。
 3. 读取线程持续读取 harness 的 stdout，直到出现 `dsh web: http://127.0.0.1:PORT`——与监督器和无密钥 CLI 冒烟测试依赖的就绪行相同——然后把窗口导航到该地址。
 4. 启动期间显示加载页（`ui/index.html`）；若 harness 在 120 秒内未报告就绪或在就绪前退出，则切换为错误页（`ui/error.html`）。
