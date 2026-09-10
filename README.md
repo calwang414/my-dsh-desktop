@@ -20,12 +20,11 @@ Environment seams for packaged builds: `DSH_DESKTOP_NODE` (node executable, defa
 
 ## Development
 
-Requirements: Rust toolchain, [tauri-cli 2](https://tauri.app), Node >= 22, and a repo state with `pnpm install` done plus `pnpm run build` artifacts (the harness serves the built `apps/web/dist` frontend and resolves workspace packages through their built `lib/`). Dev mode spawns the harness from a `deepseek-harness` checkout; a standalone clone points `DSH_DESKTOP_REPO_ROOT` at such a checkout.
+Requirements: Rust toolchain, [tauri-cli 2](https://tauri.app), Node >= 22, and a separate `deepseek-harness` checkout with `pnpm install` done plus `pnpm run build` artifacts (the harness serves the built `apps/web/dist` frontend and resolves workspace packages through their built `lib/`). This repository is the shell alone and carries no harness checkout: dev mode spawns the harness from the checkout named by `DSH_DESKTOP_REPO_ROOT`.
 
 ```sh
-pnpm run build          # repo-wide: tsc + tsdown + vite (apps/web/dist)
-cd apps/desktop/src-tauri
-cargo tauri dev         # opens the desktop window
+pnpm install && pnpm run build                                    # in the deepseek-harness checkout
+DSH_DESKTOP_REPO_ROOT=/path/to/deepseek-harness cargo tauri dev   # in this repository
 ```
 
 ## Packaging

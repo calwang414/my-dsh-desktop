@@ -20,12 +20,11 @@ DeepSeek Harness Web GUI 的 Tauri 桌面壳。壳采用"复用优先"策略：�
 
 ## 开发
 
-要求：Rust 工具链、[tauri-cli 2](https://tauri.app)、Node >= 22，以及已执行 `pnpm install` 且 `pnpm run build` 产物就绪的仓库状态（harness 服务的是构建好的 `apps/web/dist` 前端，并通过各包的构建产物 `lib/` 解析工作区依赖）。开发模式从 `deepseek-harness` 检出启动 harness；独立克隆需要把 `DSH_DESKTOP_REPO_ROOT` 指向这样的检出。
+要求：Rust 工具链、[tauri-cli 2](https://tauri.app)、Node >= 22，以及另一个已执行 `pnpm install` 且 `pnpm run build` 产物就绪的 `deepseek-harness` 检出（harness 服务的是构建好的 `apps/web/dist` 前端，并通过各包的构建产物 `lib/` 解析工作区依赖）。本仓库只包含桌面壳、不自带 harness 检出：开发模式从 `DSH_DESKTOP_REPO_ROOT` 指定的检出启动 harness。
 
 ```sh
-pnpm run build          # repo-wide: tsc + tsdown + vite (apps/web/dist)
-cd apps/desktop/src-tauri
-cargo tauri dev         # opens the desktop window
+pnpm install && pnpm run build                                    # 在 deepseek-harness 检出中执行
+DSH_DESKTOP_REPO_ROOT=/path/to/deepseek-harness cargo tauri dev   # 在本仓库中执行
 ```
 
 ## 打包

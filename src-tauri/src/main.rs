@@ -50,12 +50,21 @@ struct Harness(Mutex<Option<Child>>);
 /// Poll interval for the child-exit monitor.
 const MONITOR_INTERVAL: Duration = Duration::from_secs(1);
 
-/// The repository checkout root when running from source: src-tauri/../..
+/// The harness checkout a dev build spawns: the nearest ancestor of this
+/// crate that holds the source CLI entry. Dev mode runs that checkout's
+/// TypeScript through tsx, so the checkout lives outside this repository;
+/// DSH_DESKTOP_REPO_ROOT overrides the search.
 fn dev_repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest
         .ancestors()
-        .nth(3)
-        .expect("crate is nested exactly three levels below the repository root")
+        .find(|dir| dir.join("apps/cli/src/bin.ts").is_file())
+        .unwrap_or_else(|| {
+            panic!(
+                "no deepseek-harness checkout above {}; set DSH_DESKTOP_REPO_ROOT",
+                manifest.display()
+            )
+        })
         .to_path_buf()
 }
 
